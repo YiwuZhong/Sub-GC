@@ -1,2 +1,4 @@
 # Sub-GC
-Code repository for our paper "Comprehensive Image Captioning via Scene Graph Decomposition" in ECCV 2020.
+Pytorch code for our ECCV 2020 paper "Comprehensive Image Captioning via Scene Graph Decomposition".
+
+Under construction.
