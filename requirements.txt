@@ -1,0 +1,6 @@
+nltk==3.4.5
+h5py
+tqdm
+matplotlib
+scikit-image
+tensorboard
