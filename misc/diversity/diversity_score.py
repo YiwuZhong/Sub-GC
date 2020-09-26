@@ -1,12 +1,14 @@
 import numpy as np
 import pickle
-np.random.seed(2019)
+
 from ptbtokenizer import PTBTokenizer
 from bleu import Bleu
 import argparse
 
+np.random.seed(2019)
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--input_file', type=str, default='predictions_60000_nms_55_beam-1.npy',
+parser.add_argument('--input_file', type=str, default='captions_60000.npy',
                 help='the input file that contains the generated captions')
 parser.add_argument('--evaluate_mB4', action='store_true',
                 help='if true, evaluate mBLEU4 which takes much longer time than other metrics')
@@ -52,7 +54,7 @@ def cal_avg_B4(custom_gts, custom_res):
 
 if __name__ == '__main__':
     if 4 in metric and evaluate_mB4:
-        subgraph_sents = np.load(input_file, allow_pickle=True).tolist()
+        subgraph_sents = np.load(input_file, allow_pickle=True,encoding='latin1').tolist()
         top_N = [20, 100]  # randomly select 20 or 100 sentences and use best-5 after reranking for diversity score
         img_b4 = [[],[]]
         for img_i, item in enumerate(subgraph_sents):
@@ -80,7 +82,7 @@ if __name__ == '__main__':
         print('m-BLEU-4 for best-5 out of random 100 sentences: {}'.format(np.mean(np.array(img_b4[1]))))
 
     if 3 in metric:
-        subgraph_sents = np.load(input_file, allow_pickle=True).tolist()
+        subgraph_sents = np.load(input_file, allow_pickle=True,encoding='latin1').tolist()
         top_N = [20, 100]  # randomly select 20 or 100 sentences and use best-5 after reranking for diversity score
         n_gram = np.zeros((len(top_N), 2, len(subgraph_sents))) # 1-gram and 2-gram
 
@@ -119,8 +121,8 @@ if __name__ == '__main__':
                     coco_img_ids.append(item.split(' ')[1].strip())
             coco_img_ids = coco_img_ids[10000:]
         elif split == 'M-RNN':
-            MRNN_split_dict = np.load('../../data/MRNN_split_dict.npy', allow_pickle=True).tolist()
-            coco_img_ids = [str(k) for k,v in MRNN_split_dict.iteritems() if v == 'train']
+            MRNN_split_dict = np.load('../../data/MRNN_split_dict.npy', allow_pickle=True,encoding='latin1').tolist()
+            coco_img_ids = [str(k) for k,v in MRNN_split_dict.items() if v == 'train']
 
         all_cap_dict = pickle.load(open('all_caption_dict.pkl','rb'))
         train_sents = []
@@ -128,7 +130,7 @@ if __name__ == '__main__':
             train_sents.extend([sen.lower().replace('.','') for sen in all_cap_dict[img_id]])
         train_sents = set(train_sents)
 
-        subgraph_sents = np.load(input_file, allow_pickle=True).tolist()
+        subgraph_sents = np.load(input_file, allow_pickle=True,encoding='latin1').tolist()
         top_N = [20, 100]  # randomly select 20 or 100 sentences and use best-5 after reranking for diversity score
         novel_cnt = [0, 0]
         for img_i, item in enumerate(subgraph_sents):
@@ -145,7 +147,7 @@ if __name__ == '__main__':
         print('Novel Caption count for best-5 out of random 100 sentences: {}'.format(novel_cnt[1]))
 
     if 1 in metric:
-        subgraph_sents = np.load(input_file, allow_pickle=True).tolist()
+        subgraph_sents = np.load(input_file, allow_pickle=True,encoding='latin1').tolist()
         top_N = [20, 100] # randomly select 20 or 100 sentences and use best-5 after reranking for diversity score
         uniqueness = np.zeros((len(top_N), len(subgraph_sents)))
 

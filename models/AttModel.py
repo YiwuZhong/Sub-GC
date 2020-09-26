@@ -10,9 +10,8 @@ from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence, pad_packed_
 import numpy as np
 
 from .CaptionModel import CaptionModel
-import lib.gcn_backbone as GBackbone
-import lib.gpn as GPN
-from lib.gpn_utils import *
+import models.lib.gcn_backbone as GBackbone
+import models.lib.gpn as GPN
 
 def sort_pack_padded_sequence(input, lengths):
     sorted_lengths, indices = torch.sort(lengths, descending=True)
@@ -67,11 +66,11 @@ class AttModel(CaptionModel):
         self.topk_sampling = False if getattr(opt, 'use_topk_sampling', 0) == 0 else True
         self.topk_temp = getattr(opt, 'topk_temp', 0.6)
         self.the_k = getattr(opt, 'the_k', 3)
-        sct = getattr(opt, 'sct', 0) # show-control-tell testing mode
+        self.sct = False if getattr(opt, 'sct', 0) == 0 else True # show-control-tell testing mode
 
         # feature fusion layer
         self.obj_v_proj = nn.Linear(self.att_feat_size, self.GCN_dim)
-        object_names = np.load(opt.obj_name_path) # [0] is 'background'
+        object_names = np.load(opt.obj_name_path,encoding='latin1') # [0] is 'background'
         self.sg_obj_cnt = object_names.shape[0]
         if self.noun_fuse:
             embed_vecs = obj_edge_vectors(list(object_names), wv_dim=self.embed_dim)
@@ -79,7 +78,7 @@ class AttModel(CaptionModel):
             self.sg_obj_embed.weight.data = embed_vecs.clone()
             self.obj_emb_proj = nn.Linear(self.embed_dim, self.GCN_dim)
             self.relu = nn.ReLU(inplace=True)
-        predicate_names = np.load(opt.rel_name_path) # [0] is 'background'
+        predicate_names = np.load(opt.rel_name_path,encoding='latin1') # [0] is 'background'
         self.sg_pred_cnt = predicate_names.shape[0]
         p_embed_vecs = obj_edge_vectors(list(predicate_names), wv_dim=self.embed_dim)
         self.sg_pred_embed = nn.Embedding(predicate_names.shape[0], self.embed_dim)
@@ -93,9 +92,10 @@ class AttModel(CaptionModel):
         # GPN (sGPN)
         if self.gpn:
             self.gpn_layer = GPN.gpn_layer(GCN_dim=self.GCN_dim, hid_dim=self.att_hid_size, \
-                                           test_LSTM=self.test_LSTM, use_nms=True if sct == 0 else False, \
+                                           test_LSTM=self.test_LSTM, use_nms=False if self.sct else True, \
                                            iou_thres=getattr(opt, 'gpn_nms_thres', 0.75), \
-                                           max_subgraphs=getattr(opt, 'gpn_max_subg', 1))
+                                           max_subgraphs=getattr(opt, 'gpn_max_subg', 1), \
+                                           use_sGPN_score=True if getattr(opt, 'use_gt_subg', 0) == 0 else False)
         else:
             self.read_out_proj = nn.Sequential(nn.Linear(self.GCN_dim, self.att_hid_size), nn.Linear(self.att_hid_size,self.GCN_dim*2))
             nn.init.constant_(self.read_out_proj[0].bias, 0)
@@ -193,36 +193,17 @@ class AttModel(CaptionModel):
         if self.gpn:
             gpn_loss, subgraph_score, att_feats, fc_feats, att_masks, keep_ind = \
                 self.gpn_layer(b,N,K,L,gpn_obj_ind, gpn_pred_ind, gpn_nrel_ind,gpn_pool_mtx,att_feats,x_pred,fc_feats,att_masks)
-        else: # no gpn module
-            if opt['sct'] == 0: # baseline model
-                # use full graph
-                gpn_loss = None
-                att_feats = att_feats[0:1] # use one of 5 counterparts
+        else: # no gpn module, baseline model that use full graph
+            gpn_loss = None
+            att_feats = att_feats[0:1] # use one of 5 counterparts
 
-                read_out = torch.mean(att_feats,1)  # mean pool over full scene graph
-                fc_feats = self.read_out_proj(read_out) 
+            read_out = torch.mean(att_feats,1)  # mean pool over full scene graph
+            fc_feats = self.read_out_proj(read_out) 
 
-                att_masks = att_masks[0:1,0,0] 
-                att_masks[:,:36].fill_(1.0).float()
-                keep_ind = torch.arange(att_feats.size(0)).type_as(gpn_obj_ind)  
-                subgraph_score = torch.arange(att_feats.size(0)).fill_(1.0).type_as(att_feats)
-            else:  # sct mode
-                # each image has several sub-graphs
-                gpn_loss = None
-                pos_obj_ind, neg_obj_ind, gpn_att, gpn_pred = extract_subgraph_feats(b,N,K,L, att_feats, gpn_obj_ind, x_pred, gpn_pred_ind)
-                read_out = graph_pooling(N, gpn_att, gpn_pool_mtx, att_masks)
-                sen_batch = 2 * gpn_obj_ind.size(-2)
-
-                all_subgraph_obj_ind = gpn_obj_ind[0].contiguous().view(-1,N) 
-                att_feats = att_feats[0][all_subgraph_obj_ind.view(-1),:].view(sen_batch,N,L)
-                att_masks = att_masks[0].contiguous().view(-1, N)  
-
-                read_out = read_out.view(2,b,gpn_obj_ind.size(-2),L*2)
-                all_read_out = torch.transpose(read_out,0,1)[0].contiguous().view(-1, L*2) 
-                fc_feats = self.read_out_proj(all_read_out)
-
-                keep_ind = torch.arange(att_feats.size(0)).type_as(gpn_obj_ind)
-                subgraph_score = torch.arange(att_feats.size(0)).fill_(1.0).type_as(att_feats)
+            att_masks = att_masks[0:1,0,0] 
+            att_masks[:,:36].fill_(1.0).float()
+            keep_ind = torch.arange(att_feats.size(0)).type_as(gpn_obj_ind)  
+            subgraph_score = torch.arange(att_feats.size(0)).fill_(1.0).type_as(att_feats)
 
         beam_size = opt.get('beam_size', 10)
         batch_size = fc_feats.size(0)
@@ -277,36 +258,17 @@ class AttModel(CaptionModel):
         if self.gpn:
             gpn_loss, subgraph_score, att_feats, fc_feats, att_masks, keep_ind = \
                 self.gpn_layer(b,N,K,L,gpn_obj_ind, gpn_pred_ind, gpn_nrel_ind,gpn_pool_mtx,att_feats,x_pred,fc_feats,att_masks)
-        else: # no gpn module         
-            if opt['sct'] == 0:  # baseline model
-                # use full graph
-                gpn_loss = None
-                att_feats = att_feats[0:1] # use one of 5 counterparts
+        else: # no gpn module, baseline model that use full graph
+            gpn_loss = None
+            att_feats = att_feats[0:1] # use one of 5 counterparts
 
-                read_out = torch.mean(att_feats,1)  # mean pool over full scene graph
-                fc_feats = self.read_out_proj(read_out) 
+            read_out = torch.mean(att_feats,1)  # mean pool over full scene graph
+            fc_feats = self.read_out_proj(read_out) 
 
-                att_masks = att_masks[0:1,0,0] 
-                att_masks[:,:36].fill_(1.0).float()
-                keep_ind = torch.arange(att_feats.size(0)).type_as(gpn_obj_ind)  
-                subgraph_score = torch.arange(att_feats.size(0)).fill_(1.0).type_as(att_feats)
-            else:  # sct mode
-                # each image has several sub-graphs
-                gpn_loss = None
-                pos_obj_ind, neg_obj_ind, gpn_att, gpn_pred = extract_subgraph_feats(b,N,K,L, att_feats, gpn_obj_ind, x_pred, gpn_pred_ind)
-                read_out = graph_pooling(N, gpn_att, gpn_pool_mtx, att_masks)
-                sen_batch = 2 * gpn_obj_ind.size(-2)
-
-                all_subgraph_obj_ind = gpn_obj_ind[0].contiguous().view(-1,N)  
-                att_feats = att_feats[0][all_subgraph_obj_ind.view(-1),:].view(sen_batch,N,L)
-                att_masks = att_masks[0].contiguous().view(-1, N)  
-
-                read_out = read_out.view(2,b,gpn_obj_ind.size(-2),L*2)
-                all_read_out = torch.transpose(read_out,0,1)[0].contiguous().view(-1, L*2) 
-                fc_feats = self.read_out_proj(all_read_out)
-                
-                keep_ind = torch.arange(att_feats.size(0)).type_as(gpn_obj_ind)
-                subgraph_score = torch.arange(att_feats.size(0)).fill_(1.0).type_as(att_feats)
+            att_masks = att_masks[0:1,0,0] 
+            att_masks[:,:36].fill_(1.0).float()
+            keep_ind = torch.arange(att_feats.size(0)).type_as(gpn_obj_ind)  
+            subgraph_score = torch.arange(att_feats.size(0)).fill_(1.0).type_as(att_feats)
 
         batch_size = fc_feats.size(0)
         state = self.init_hidden(batch_size)
@@ -379,7 +341,7 @@ class AttModel(CaptionModel):
             return logprobs, state
 
     def init_hidden(self, bsz):
-        weight = next(self.parameters())
+        weight = self.logit.weight if hasattr(self.logit, "weight") else self.logit[0].weight
         return (weight.new_zeros(self.num_layers, bsz, self.rnn_size),
                 weight.new_zeros(self.num_layers, bsz, self.rnn_size))
 
@@ -414,7 +376,7 @@ class AttModel(CaptionModel):
             obj_emb = self.obj_emb_proj(self.sg_obj_embed(obj_dist.view(-1, self.sg_obj_cnt)[:,1:].max(1)[1] + 1)).view(obj_dist.size(0), obj_dist.size(1), self.GCN_dim)
             att_feats = self.obj_v_proj(att_feats)
             att_feats = self.relu(att_feats + obj_emb)
-        else: # GCN-LSTM baseline
+        else: # GCN-LSTM baseline that use full graph
             att_feats = self.obj_v_proj(att_feats)
         
         if self.pred_emb_type == 1: # hard emb, not including background

@@ -20,12 +20,12 @@ class HybridLoader:
         self.db_path = db_path
         self.ext = ext
         if self.ext == '.npy':
-            self.loader = lambda x: np.load(x)
+            self.loader = lambda x: np.load(x,encoding='latin1')
         else:
             if "sg" or "graph" in db_path:
-                self.loader = lambda x: np.load(x,allow_pickle=True)['feat'].tolist() 
+                self.loader = lambda x: np.load(x,allow_pickle=True,encoding='latin1')['feat'].tolist() 
             else:
-                self.loader = lambda x: np.load(x)['feat']
+                self.loader = lambda x: np.load(x,encoding='latin1')['feat']
         self.db_type = 'dir'
     
     def get(self, key):
@@ -39,7 +39,7 @@ class HybridLoader:
 class pklLoader:
     def __init__(self, db_path):
         self.db_path = db_path
-        self.loader = lambda x: np.load(x)['feat']
+        self.loader = lambda x: np.load(x,encoding='latin1')['feat']
 
 class DataLoader(data.Dataset):
 
@@ -70,7 +70,7 @@ class DataLoader(data.Dataset):
         print('vocab size is ', self.vocab_size)
         
         # open the hdf5 file
-        print('DataLoader loading h5 file: ', opt.input_fc_dir, opt.input_att_dir, opt.input_box_dir, opt.input_label_h5)
+        print('DataLoader loading h5 file: ', opt.input_label_h5)
         self.h5_label_file = h5py.File(self.opt.input_label_h5, 'r', driver='core')
         
         if 'flickr' in opt.input_label_h5:
@@ -81,10 +81,13 @@ class DataLoader(data.Dataset):
         use_MRNN_split = opt.use_MRNN_split 
         mask_version = '1000'
         self.thres = opt.gpn_label_thres
-        self.use_gt_subg = opt.use_gt_subg  #False  # if True, use gt sub-graphs, for SCT training and testing
+        self.use_gt_subg = opt.use_gt_subg # if True, use gt sub-graphs (Sup. model for SCT)
         self.trip_loader = HybridLoader("data/{}_sg_output_64".format(dataset_name), ".npz") 
-        self.subgraph_mask = HybridLoader("data/{}_graph_mask_{}_rm_duplicate".format(dataset_name,mask_version), ".npz") 
-
+        if not self.use_gt_subg:
+            self.subgraph_mask = HybridLoader("data/{}_graph_mask_{}_rm_duplicate".format(dataset_name,mask_version), ".npz") 
+        else:
+            self.subgraph_mask = HybridLoader("data/{}_gt_graph_mask".format(dataset_name), ".npz")
+        
         # load in the sequence data
         self.label = self.h5_label_file['labels'][:]
         seq_size = self.h5_label_file['labels'].shape
@@ -99,7 +102,7 @@ class DataLoader(data.Dataset):
 
         self.split_ix = {'train': [], 'val': [], 'test': []}
         if use_MRNN_split:
-            MRNN_split_dict = np.load('data/MRNN_split_dict.npy',allow_pickle=True).tolist()
+            MRNN_split_dict = np.load('data/MRNN_split_dict.npy',allow_pickle=True,encoding='latin1').tolist()
             for ix in range(len(self.info['images'])):
                 img = self.info['images'][ix]
                 if MRNN_split_dict[img['id']] == 'train': 

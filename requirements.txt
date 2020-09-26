@@ -4,3 +4,6 @@ tqdm
 matplotlib
 scikit-image
 tensorboard
+stanfordcorenlp==3.9.1.1
+speaksee==0.0.1 
+munkres==1.0.12

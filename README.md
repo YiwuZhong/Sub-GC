@@ -1,20 +1,18 @@
 # Sub-GC
 
-This repository includes the Pytorch code for our paper "Comprehensive Image Captioning via Scene Graph Decomposition" in ECCV 2020.
+This repository includes the Pytorch code for our paper "[Comprehensive Image Captioning via Scene Graph Decomposition](https://arxiv.org/pdf/2007.11731.pdf)" in ECCV 2020.
 
 ![](model_overview.png)
 
 [[Project Page]](http://pages.cs.wisc.edu/~yiwuzhong/Sub-GC.html) [[Paper]](https://arxiv.org/pdf/2007.11731.pdf)
 
-For now, we provide the code for training and testing on COCO Caption dataset. The code for Flickr30k will be released shortly. We will keep the repo updated. Stay tuned!
-
 ## Dependencies
-* Python 2.7
+* Python 3+
 * Pytorch 1.3.0+
 
 Python and Pytorch can be installed by anaconda, run
 ```
-conda create --name ENV_NAME python=2.7
+conda create --name ENV_NAME python=3
 source activate ENV_NAME
 conda install pytorch torchvision cudatoolkit=10.1 -c pytorch
 ```
@@ -24,54 +22,7 @@ For the other dependencies, run `pip install -r requirements.txt` to install.
 
 ## Data
 
-First download all the data from [Google Drive](https://drive.google.com/drive/folders/1mCx8R8d36ZpUSoVZKExs0FDA_IXiAiZA?usp=sharing). After that, extract the files from the compressed `*.zip` files and merge folders of `*_part1/`, `*_part2/` and `*_part3/` into a new folder `COCO_sg_output_64/`. The folder structure should be as follows:
-```
-├── data
-│   ├── COCO_graph_mask_1000_rm_duplicate
-│   │   ├── 9.npz
-│   │   ├── ...
-│   │   └── 581929.npz
-│   ├── COCO_sg_output_64
-│   │   ├── 9.npz
-│   │   ├── ...
-│   │   └── 581929.npz
-│   ├── cocotalk_label.h5
-│   ├── cocotalk.json
-│   ├── flickr30ktalk_label.h5
-│   ├── flickr30ktalk.json
-│   ├── glove.6B.300d.pt
-│   └── gvd_all_dict.npy
-│
-├── misc
-│   └── consensus_reranking
-│       ├── image_features_mRNN
-│       │   ├── res_feat_101_dct_flickr30k.npy
-│       │   └── res_feat_101_dct_mscoco_2014.npy
-│       └── mscoco_anno_files
-│           ├── anno_list_mscoco_trainModelVal_m_RNN.npy
-│           ├── flickr30k_karpathy_train_val_anno_list.npy
-│           └── karpathy_train_val_anno_list.npy
-└── pretrained
-    ├── full_gc
-    │   ├── infos_topdown-33000.pkl
-    │   └── model-33000.pth
-    ├── sub_gc_karpathy
-    │   ├── infos_topdown-60000.pkl
-    │   └── model-60000.pth
-    └── sub_gc_MRNN
-        ├── infos_topdown-60000.pkl
-        └── model-60000.pth
-```
-Finally, move the files to the same directories (`data`, `misc`, `pretrained`) in this repository. Please make sure that the final folder structure is kept the same.
-
-The sub-folder `data/COCO_sg_output_64/` contains object detection features from [Bottom-Up](https://github.com/peteanderson80/bottom-up-attention) as well as the detected scene graphs from [Motif-Net](https://github.com/rowanz/neural-motifs) pre-trained on Visual Genome. The sub-folder `data/COCO_graph_mask_1000_rm_duplicate/` stores the sampled sub-graphs. The folder `pretrained/` includes the pre-trained models of our paper. The file `glove.6B.300d.pt` contains the GloVe word embeddings. Files of `res_feat*` are the global image features (ResNet-101) for each image in the datasets. The rest of the files are dataset-related annotations.
-
-To download the code and models for SPICE, run
-```
-cd coco-caption
-bash get_stanford_models.sh
-cp -r pycocoevalcap/spice/lib ../misc/consensus_reranking/external/coco-caption/pycocoevalcap/spice/
-```
+Check [DATA.md](https://github.com/YiwuZhong/Sub-GC-Draft/blob/master/DATA.md) for instructions of data downloading.
 
 ## Model Training
 
@@ -79,11 +30,16 @@ To train our image captioning models, run the script
 ```
 bash train.sh MODEL_TYPE
 ```
-by replacing `MODEL_TYPE` with one of `[Sub_GC_MRNN, Sub_GC_Kar, Full_GC_Kar]`. `MODEL_TYPE` specifies the dataset, the data split and the model used for training. See details below.
+by replacing `MODEL_TYPE` with one of `[Sub_GC_MRNN, Sub_GC_Kar, Full_GC_Kar, Sub_GC_Flickr, Sub_GC_Sup_Flickr]`. `MODEL_TYPE` specifies the dataset, the data split and the model used for training. See details below.
 
-* `Sub_GC_MRNN`: train a sub-graph captioning model on M-RNN split of COCO (Table 2 in our paper)
-* `Sub_GC_Kar`: train a sub-graph captioning model on Karpathy split of COCO (Table 3 in our paper)
-* `Full_GC_Kar`: train a full-graph captioning model on Karpathy split of COCO (Table 3 in our paper)
+1. COCO Caption Dataset
+    * `Sub_GC_MRNN`: train a sub-graph captioning model on M-RNN split (Table 2 in our paper)
+    * `Sub_GC_Kar`: train a sub-graph captioning model on Karpathy split (Table 3 in our paper)
+    * `Full_GC_Kar`: train a full-graph captioning model on Karpathy split (Table 3 in our paper)
+
+2. Flickr30K Dataset
+    * `Sub_GC_Flickr`: train a sub-graph captioning model (Table 4 & 5 in our paper)
+    * `Sub_GC_Sup_Flickr`: train a supervised sub-graph captioning model (Table 5 in our paper)
 
 You can set `CUDA_VISIBLE_DEVICES` in `train.sh` to specify which GPUs are used for model training (e.g., the default script uses 2 GPUs).
 
@@ -98,14 +54,21 @@ To generate captions, run the script
 ```
 bash test.sh MODEL_TYPE
 ```
-by replacing `MODEL_TYPE` with one of `[Sub_GC_MRNN, Sub_GC_S_MRNN, Sub_GC_Kar, Full_GC_Kar]`. `MODEL_TYPE` specifies the dataset, the data split and the model used for sentence generation. See details below.
+by replacing `MODEL_TYPE` with one of `[Sub_GC_MRNN, Sub_GC_S_MRNN, Sub_GC_Kar, Full_GC_Kar, Sub_GC_Flickr, Sub_GC_Flickr_GRD, Sub_GC_Flickr_CTL, Sub_GC_Sup_Flickr_CTL]`. `MODEL_TYPE` specifies the dataset, the data split and the model used for sentence generation. See details below.
 
-* `Sub_GC_MRNN`: use the sub-graph captioning model Sub-GC on M-RNN split of COCO (Table 2 in our paper)
-* `Sub_GC_S_MRNN`: use Sub-GC with top-k sampling (Sub-GC-S) on M-RNN split of COCO (Table 2 in our paper)
-* `Sub_GC_Kar`: use the sub-graph captioning model Sub-GC on Karpathy split of COCO (Table 3 in our paper)
-* `Full_GC_Kar`: use the full graph captioning model Full-GC on Karpathy split of COCO (Table 3 in our paper)
+1. COCO Caption Dataset
+    * `Sub_GC_MRNN`: use the sub-graph captioning model (Sub-GC) on M-RNN split (Table 2 in our paper)
+    * `Sub_GC_S_MRNN`: use Sub-GC with top-k sampling (Sub-GC-S) on M-RNN split (Table 2 in our paper)
+    * `Sub_GC_Kar`: use the sub-graph captioning model (Sub-GC) on Karpathy split (Table 3 in our paper)
+    * `Full_GC_Kar`: use the full graph captioning model (Full-GC) on Karpathy split (Table 3 in our paper)
 
-The inference results will be saved in a `*.npy` file at the same folder as the model checkpoint (e.g., `pretrained/sub_gc_MRNN`). `$CAPTION_FILE` will be used as the name of generated `*.npy` file in the following instructions.
+2. Flickr30K Dataset
+    * `Sub_GC_Flickr`: use Sub-GC for top-1 caption accuracy evaluation (Table 4 in our paper)
+    * `Sub_GC_Flickr_GRD`: use Sub-GC for grounding evaluation (Table 4 in our paper)
+    * `Sub_GC_Flickr_CTL`: use Sub-GC for controllability evaluation (Table 5 in our paper)
+    * `Sub_GC_Sup_Flickr_CTL`: use Sub-GC (Sup.) for controllability evaluation (Table 5 in our paper)
+
+The inference results will be saved in a `captions_*.npy` file at the same folder as the model checkpoint (e.g., `pretrained/sub_gc_MRNN`). `$CAPTION_FILE` will be used as the name of generated `captions_*.npy` file in the following instructions.
 
 ### Diversity Evaluation
 
@@ -125,17 +88,31 @@ python diversity_score.py --input_file $CAPTION_FILE --evaluate_mB4
 In our paper, we report the top-1 accuracy of the best caption selected by sGPN+consensus. To reproduce the results, move the generated `$CAPTION_FILE` into folder `misc/consensus_reranking/hypotheses_mRNN` and run:
 ```
 cd misc/consensus_reranking
-python cr_mRNN_demo.py --top_k 4 --caption_file $CAPTION_FILE --dataset coco --split MRNN
+python cr_mRNN_demo.py --input_file $CAPTION_FILE --dataset coco --split MRNN --top_k 4 
 ```
-This will apply consensus reranking on the top 4 captions selected by our sGPN scores as described in our paper. The arguments of `--dataset` and `--split` specify the dataset (`coco` or `flickr30k`) and the split (`MRNN` or `karpathy`), respectively. Note that only COCO dataset is supported by current code.
+This will apply [consensus reranking](https://github.com/mjhucla/mRNN-CR) on the top 4 captions selected by our sGPN scores as described in our paper. The arguments of `--dataset` and `--split` specify the dataset (`coco` or `flickr30k`) and the split (`MRNN` or `karpathy`), respectively.
 
 If you want to evaluate the top-1 caption selected by our sGPN or the top-1 accuracy for Full-GC, set `--only_sent_eval` to `1` in `test.sh` and rerun the bash file. If you want to evaluate the oracle scores which will take a few hours, set `--only_sent_eval` to `1` and add `--orcle_num 1000` in `test.sh`, and rerun the bash file.
 
 ### Grounding Evaluation (on Flickr30k)
-Under construction.
+In our paper, we report the grounding scores of the best caption selected by sGPN+consensus. To reproduce the results, this section requires 3 substeps:
+
+1. Select the best caption by consensus reranking: use our sub-graph captioning model to generate captions (`bash test.sh Sub_GC_Flickr_GRD`), and apply consensus reranking on the top generated captions (see instruction in the section of Top-1 Accuracy Evaluation). A file named `consensus_rerank_ind.npy` that contains the ranking indices will be generated at `misc/consensus_reranking`.
+
+2. Collect the grounding results for the best caption: move `consensus_rerank_ind.npy` into the same folder of the model checkpoint (e.g., `pretrained/sub_gc_flickr`). Run `bash test.sh Sub_GC_Flickr_GRD` again and `grounding_file.json` that contains the grounding results will be generated at the same folder of the model checkpoint.
+
+3. Evaluate the grounding results: move `grounding_file.json` into `misc/grounding` and run `cd misc/grounding; python grounding_score.py`.
+
+This section follows the implementation from [grounding evaluation](https://github.com/facebookresearch/grounded-video-description/tree/flickr_branch), which evaluates the grounding performance without beam search. To this end, we disable beam search for the grounding evaluation.
 
 ### Controllability Evaluation (on Flickr30k)
-Under construction.
+After running `bash test.sh MODEL_TYPE` with `MODEL_TYPE` as `Sub_GC_Flickr_CTL` or `Sub_GC_Sup_Flickr_CTL`, an output file `$CTL_CAPTION_FILE` (e.g., `ctl_captions_*.npy`) will be generated and locate at the same folder as the model checkpoint (e.g., `pretrained/sub_gc_sup_flickr`). This output file stores the predicted captions which are ready for [controllability evaluation](https://github.com/aimagelab/show-control-and-tell).
+
+To obtain the controllability scores, move that output file into folder `misc/controllability` and run
+```
+cd misc/controllability
+python controllability_score.py --input_file $CTL_CAPTION_FILE
+```
 
 ## Acknowledgement
 

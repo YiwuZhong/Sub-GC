@@ -180,7 +180,7 @@ def parse_opt():
     parser.add_argument('--use_MRNN_split', action='store_true',
                     help='use the split of MRNN on COCO Caption dataset')   
     parser.add_argument('--use_gt_subg', action='store_true',
-                    help='use the ground-truth sub-graphs (for SCT training and testing)') 
+                    help='(Sup. model for SCT) use the ground-truth sub-graphs without neighbors and same-cls nodes') 
     parser.add_argument('--gpn_batch', type=int, default=2, 
                     help='the batch size for positive/negative sub-graphs during training')    
     parser.add_argument('--obj_num', type=int, default=37, 

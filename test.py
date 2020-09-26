@@ -127,7 +127,9 @@ parser.add_argument('--rel_name_path', type=str, default='data/predicate_names_1
 parser.add_argument('--use_MRNN_split', action='store_true',
                 help='use the split of MRNN on COCO Caption dataset')
 parser.add_argument('--use_gt_subg', action='store_true',
-                help='use the ground-truth sub-graphs (for SCT training and testing)') 
+                help='(Sup. model for SCT) use the ground-truth sub-graphs without neighbors and same-cls nodes') 
+parser.add_argument('--use_greedy_subg', action='store_true',
+                help='(Unsup. model for SCT) use gt box to greedily find the sub-graphs with neighbors and same-cls nodes') 
 # parser.add_argument('--gpn_batch', type=int, default=2, 
 #                 help='the batch size for positive/negative sub-graphs during training')    
 parser.add_argument('--obj_num', type=int, default=37, 
@@ -157,7 +159,7 @@ parser.add_argument('--only_sent_eval', type=int, default=0,
                 help='evaluate sentence scores: 1, only run sentence evaluation; 0, only generate sentences')
 parser.add_argument('--oracle_num', type=int, default=1, 
                 help='how many sentences are used to calculate the top-1 accuracy')
-# grounding attention return triger
+# grounding attention triger
 parser.add_argument('--return_att', type=int, default=0, 
                 help='1: return attention weight for each time step, for grounding evaluation')
 # show-control-tell mode triger
@@ -168,7 +170,7 @@ opt = parser.parse_args()
 
 if __name__ == '__main__':
     # Load infos from trained model files
-    with open(opt.infos_path) as f:
+    with open(opt.infos_path, 'rb') as f:
         infos = utils.pickle_load(f)
 
     # override and collect parameters

@@ -56,13 +56,14 @@ def language_eval(dataset, align_pred, model_id, split, save_path, is_flickr=Fal
     '''
     evaluate the generated sentences
     '''
-    sys.path.append("coco-caption")
-    if is_flickr:
-        annFile = 'coco-caption/annotations/caption_flickr30k.json'
-    else:
-        annFile = 'coco-caption/annotations/captions_val2014.json'
+    sys.path.append("misc/coco-caption")
     from pycocotools.coco import COCO
     from pycocoevalcap.eval import COCOEvalCap
+
+    if is_flickr:
+        annFile = 'misc/coco-caption/annotations/caption_flickr30k.json'
+    else:
+        annFile = 'misc/coco-caption/annotations/captions_val2014.json'
     coco = COCO(annFile)
     valids = coco.getImgIds()
     if not os.path.isdir('eval_results'):

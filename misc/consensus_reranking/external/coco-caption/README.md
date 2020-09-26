@@ -5,7 +5,7 @@ Evaluation codes for MS COCO caption generation.
 
 ## Requirements ##
 - java 1.8.0
-- python 3
+- python 2 or 3
   - gensim
 
 ## Files ##
@@ -37,6 +37,14 @@ Evaluation codes for MS COCO caption generation.
 - Note: SPICE will try to create a cache of parsed sentences in ./pycocoevalcap/spice/cache/. This dramatically speeds up repeated evaluations. The cache directory can be moved by setting 'CACHE_DIR' in ./pycocoevalcap/spice. In the same file, caching can be turned off by removing the '-cache' argument to 'spice_cmd'. 
 - You will also need to download the Google News negative 300 word2vec model for use by WMD. To do this, run:
     bash get_google_word2vec_model.sh
+
+
+### AllSPICE
+AllSPICE is a metric measuring both diversity and accuracy of a generated caption set. This is proposed in [Analysis of diversity-accuracy tradeoff in image captioning](https://arxiv.org/abs/2002.11848).
+
+See [cocoEvalAllSPICEDemo.ipynb](cocoEvalAllSPICEDemo.ipynb) to learn how to use it.
+
+You can also check out [ruotianluo/self-critical.pytorch/eval_multi.py](https://github.com/ruotianluo/self-critical.pytorch/blob/master/eval_multi.py#L36) to see how it is used in practice and [ruotianluo/SPICE](https://github.com/ruotianluo/SPICE/commit/046d8cf73db93653c0e22fdd0ed65d2106642244) to see what change was made to the original SPICE code to realize AllSPICE.
 
 ## References ##
 

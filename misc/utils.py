@@ -11,6 +11,7 @@ import os
 
 import six
 from six.moves import cPickle
+import pickle
 
 bad_endings = ['with','in','on','of','a','at','to','for','an','this','his','her','that']
 bad_endings += ['the']
@@ -21,6 +22,7 @@ def pickle_load(f):
     ----------
     f: file-like object
     """
+    return pickle.load(f)
     if six.PY3:
         return cPickle.load(f, encoding='latin-1')
     else:
@@ -34,6 +36,7 @@ def pickle_dump(obj, f):
     obj: pickled object
     f: file-like object
     """
+    return pickle.dump(obj, f)
     if six.PY3:
         return cPickle.dump(obj, f, protocol=2)
     else:

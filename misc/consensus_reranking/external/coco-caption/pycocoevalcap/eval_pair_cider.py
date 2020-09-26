@@ -1,8 +1,8 @@
 # JMao: Movidfined from eval.py from https://github.com/tylin/coco-caption
 # Used to calcuate cider distance between two sentences
 
-from tokenizer.ptbtokenizer import PTBTokenizer
-from cider.cider_scorer_compute_sentence import CiderScorer
+from .tokenizer.ptbtokenizer import PTBTokenizer
+from .cider.cider_scorer_compute_sentence import CiderScorer
 
 class COCOEvalCapPairCider:
     def __init__(self, coco):
@@ -24,7 +24,7 @@ class COCOEvalCapPairCider:
             res[imgId] = self.coco.imgToAnns[imgId]
 
         # Tokenize
-        print 'tokenization...'
+        print('tokenization...')
         tokenizer = PTBTokenizer()
         gts  = tokenizer.tokenize(gts)
         res = tokenizer.tokenize(res)

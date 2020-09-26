@@ -11,12 +11,11 @@ import json
 import sys
 import logging
 
-import conf_cr
-import bleu_score_util as bs_util
+from . import conf_cr
+from . import bleu_score_util as bs_util
 
 # library for COCO evaluation
 sys.path.append('./external/coco-caption')
-sys.path.append("coco-caption")
 from pycocotools.coco import COCO
 from pycocoevalcap.eval import COCOEvalCap
 from pycocoevalcap.eval_pair_cider import COCOEvalCapPairCider
@@ -50,10 +49,10 @@ class Consensus_Reranking:
     def load_anno_ref_hypo(self):
         # Load reference annotation list
         fname_anno_list_ref = self.conf.fname_anno_list_ref
-        self.anno_list_ref = np.load(fname_anno_list_ref,allow_pickle=True).tolist()
+        self.anno_list_ref = np.load(fname_anno_list_ref,allow_pickle=True,encoding='latin1').tolist()
         # Load hypo annotation list
         fname_hypo_list = self.conf.fname_hypo_list
-        self.anno_list_hypo = np.load(fname_hypo_list,allow_pickle=True).tolist()
+        self.anno_list_hypo = np.load(fname_hypo_list,allow_pickle=True,encoding='latin1').tolist()
         logger.info('Successfully load %d reference and %d hypothese annotations' \
             % (len(self.anno_list_ref), len(self.anno_list_hypo) ) )
             
@@ -63,10 +62,10 @@ class Consensus_Reranking:
             os.makedirs(fol_cache)
         fname_NNimg_list = os.path.join(fol_cache, 'NNimg_list_%s_%s_top%d.npy' \
             % (self.conf.name_feat, self.conf.distance_metric, self.conf.num_NNimg) )
-        if os.path.isfile(fname_NNimg_list):
-            self.NNimg_list = np.load(fname_NNimg_list,allow_pickle=True).tolist()
-            logger.info('NN images list is loaded')
-            return
+        #if os.path.isfile(fname_NNimg_list):
+            #self.NNimg_list = np.load(fname_NNimg_list,allow_pickle=True,encoding='latin1').tolist()
+            #logger.info('NN images list is loaded')
+            #return
     
         num_tr = len(self.anno_list_ref)
         num_te = len(self.anno_list_hypo)
@@ -75,31 +74,31 @@ class Consensus_Reranking:
         # Load and arrange features
         fname_img_feat_tr = os.path.join(fol_cache, '%s_arr_tr.npy' % self.conf.name_feat)
         fname_img_feat_te = os.path.join(fol_cache, '%s_arr_te.npy' % self.conf.name_feat)
-        if not (os.path.isfile(fname_img_feat_tr) and os.path.isfile(fname_img_feat_te) ):
-            # Load image feature dictionary
-            fname_dct_feat = self.conf.fname_dct_feat
-            dct_feat = np.load(fname_dct_feat,allow_pickle=True).tolist()
-            logger.info('Dictionary of image features loaded from %s' \
-                % fname_dct_feat )
-            # Arrange the image feature with the same order of 
-            # anno_list_ref and anno_list_hypo
-            feat_arr_tr = np.zeros((num_tr, self.conf.dim_image_feat), dtype=np.float64)
-            for (ind, anno) in enumerate(self.anno_list_ref):
-                feat_arr_tr[ind, :] = dct_feat[anno['id']]
-            feat_arr_te = np.zeros((num_te, self.conf.dim_image_feat), dtype=np.float64)
-            for (ind, anno) in enumerate(self.anno_list_hypo):
-                feat_arr_te[ind, :] = dct_feat[anno['id']]
-            if self.conf.del_useless:
-                del dct_feat
-            np.save(fname_img_feat_tr, feat_arr_tr)
-            np.save(fname_img_feat_te, feat_arr_te)
-            logger.info('Image features arranged and saved')
-        else:
-            feat_arr_tr = np.load(fname_img_feat_tr,allow_pickle=True)
-            feat_arr_te = np.load(fname_img_feat_te,allow_pickle=True)
-            assert(feat_arr_tr.shape[1]==self.conf.dim_image_feat)
-            assert(feat_arr_te.shape[1]==self.conf.dim_image_feat)
-            logger.info('Arranged image features loaded')
+        #if not (os.path.isfile(fname_img_feat_tr) and os.path.isfile(fname_img_feat_te) ):
+        # Load image feature dictionary
+        fname_dct_feat = self.conf.fname_dct_feat
+        dct_feat = np.load(fname_dct_feat,allow_pickle=True,encoding='latin1').tolist()
+        logger.info('Dictionary of image features loaded from %s' \
+            % fname_dct_feat )
+        # Arrange the image feature with the same order of 
+        # anno_list_ref and anno_list_hypo
+        feat_arr_tr = np.zeros((num_tr, self.conf.dim_image_feat), dtype=np.float64)
+        for (ind, anno) in enumerate(self.anno_list_ref):
+            feat_arr_tr[ind, :] = dct_feat[anno['id']]
+        feat_arr_te = np.zeros((num_te, self.conf.dim_image_feat), dtype=np.float64)
+        for (ind, anno) in enumerate(self.anno_list_hypo):
+            feat_arr_te[ind, :] = dct_feat[anno['id']]
+        if self.conf.del_useless:
+            del dct_feat
+        np.save(fname_img_feat_tr, feat_arr_tr)
+        np.save(fname_img_feat_te, feat_arr_te)
+        logger.info('Image features arranged and saved')
+        #else:
+            #feat_arr_tr = np.load(fname_img_feat_tr,allow_pickle=True,encoding='latin1')
+            #feat_arr_te = np.load(fname_img_feat_te,allow_pickle=True,encoding='latin1')
+            #assert(feat_arr_tr.shape[1]==self.conf.dim_image_feat)
+            #assert(feat_arr_te.shape[1]==self.conf.dim_image_feat)
+            #logger.info('Arranged image features loaded')
         
         # Finding NN images
         if self.conf.cal_distance_all:
@@ -109,7 +108,7 @@ class Consensus_Reranking:
             self.NNimg_list = np.argsort(dis_trte, axis=1)[:, :self.conf.num_NNimg].tolist()
         else:
             NNimg_list = []
-            for ind_t in xrange(feat_arr_te.shape[0]):
+            for ind_t in range(feat_arr_te.shape[0]):
                 feat_te_tmp = feat_arr_te[ind_t, :].reshape((1, self.conf.dim_image_feat) )
                 dis_trte_tmp = distance.cdist(feat_te_tmp, feat_arr_tr, self.conf.distance_metric)
                 NNimg_list.append(np.argsort(dis_trte_tmp, axis=1)[0, :self.conf.num_NNimg].tolist() )
@@ -153,7 +152,7 @@ class Consensus_Reranking:
         for (ind_te, anno) in enumerate(anno_list_reranked): # anno: a dict for an image, 10 sentences are in 'gen_beam_search_10'
             sentences_gen = anno[self.conf.gen_method]
             sentences_ret = []
-            for ind_NN in xrange(k):
+            for ind_NN in range(k):
                 ind_tr = self.NNimg_list[ind_te][ind_NN]
                 sentences_ret += self.anno_list_ref[ind_tr]['sentences']
             sim = []
@@ -177,7 +176,7 @@ class Consensus_Reranking:
             if (ind_te + 1) % self.conf.num_show_finished == 0:
                 logger.info('%d image reranking finished' % (ind_te + 1) )
 
-        #np.save(self.conf.fname_hypo_list.split("/")[-1].split(".")[0] + "_rerank_ind.npy", rerank_ind)
+        np.save("consensus_rerank_ind.npy", rerank_ind) # the index of sorted sentences; the index will be used in grounding evaluation
         self.anno_list_reranked = anno_list_reranked # list of dicts, each dict is an image
         fname_anno_list_reranked = os.path.join(fol_cache, 'anno_list_hypo_rerank_%s_%s.npy' \
             % (self.conf.name_feat, self.conf.distance_metric) )
@@ -187,8 +186,8 @@ class Consensus_Reranking:
         if flag_eval:
             fname_coco_json = os.path.join(fol_cache, 'coco_json_%s_%s_%s.json' \
                 % (self.conf.name_feat, self.conf.distance_metric, method) )
-            fout_eval = open(os.path.join(fol_cache, 'eval_stat_%s_%s_%s.txt' \
-                % (self.conf.name_feat, self.conf.distance_metric, method) ), 'w')
+            #fout_eval = open(os.path.join(fol_cache, 'eval_stat_%s_%s_%s.txt' \
+                #% (self.conf.name_feat, self.conf.distance_metric, method) ), 'w')
             self._anno_genS2coco(anno_list_reranked, key_reranking, 0, fname_coco_json)  # 0: only save top-1 sentence after re-ranking
                 
             coco = COCO(self.conf.fname_eval_ref)
@@ -199,9 +198,9 @@ class Consensus_Reranking:
                 
             # print output evaluation scores
             for metric, score in cocoEval.eval.items():
-                print '%s: %.3f'%(metric, score)
-                print >>fout_eval, '%s: %.3f'%(metric, score)
-            fout_eval.close()
+                print('%s: %.3f'%(metric, score))
+                #print >>fout_eval, '%s: %.3f'%(metric, score)
+            #fout_eval.close()
             
             self.cocoEval = cocoEval
             

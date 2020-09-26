@@ -16,7 +16,7 @@ import misc.utils as utils
 import math
 from collections import defaultdict
 from misc.sentence_utils import *
-#from misc.grd_utils import *
+from misc.grd_utils import *
 
 random_seed = 2019
 np.random.seed(random_seed)
@@ -42,15 +42,17 @@ def eval_split(model, crit, loader, eval_kwargs={}, opt=None, val_model=None):
     # grounding experiments
     return_att_weight = True if eval_kwargs.get('return_att', 0) == 1 else False
     if return_att_weight:
-        assert beam_size == 1, "Not Implemented for grouding with beam size >1"
-        gvd_all_dict = np.load('data/gvd_all_dict.npy', allow_pickle=True).tolist()
+        assert beam_size == 1, "GVD repo only supports grounding evaluation with beam size as 1"
+        gvd_all_dict = np.load('data/gvd_all_dict.npy', allow_pickle=True,encoding='latin1').tolist()
         ind_to_wd = gvd_all_dict['ind_to_wd']
         wd_to_lemma = gvd_all_dict['wd_to_lemma']
         lemma_det_id_dict = gvd_all_dict['lemma_det_id_dict']
         det_id_to_det_wd = gvd_all_dict['det_id_to_det_wd']
         grd_output = defaultdict(list)
-        grd_and_sent = {}
-        grd_and_sent['sent'] = []
+        model_path = eval_kwargs['infos_path'].split('/')
+        consensus_rerank_file = model_path[0] + '/' + model_path[1] + '/consensus_rerank_ind.npy'
+        grd_sGPN_consensus = True if os.path.isfile(consensus_rerank_file) else False
+
     # controllability experiments
     sct_mode = True if eval_kwargs.get('sct', 0) == 1 else False
 
@@ -100,14 +102,14 @@ def eval_split(model, crit, loader, eval_kwargs={}, opt=None, val_model=None):
                         seqq, seqLogprobs, subgraph_score, keep_nms_ind = model(fc_feats, att_feats, att_masks, trip_pred,\
                                    obj_dist, obj_box, rel_ind, pred_fmap, pred_dist, gpn_obj_ind, gpn_pred_ind, gpn_nrel_ind, gpn_pool_mtx,\
                                    opt=eval_kwargs, mode='sample')
-                    if not sct_mode:  # sub-graph captioning
-                        if model.gpn: # joint model
+                    if not sct_mode:
+                        if model.gpn: # sub-graph captioning model
                             sorted_score, sort_ind = torch.sort(subgraph_score,descending=True)
                             seq = seqq[sort_ind].data
                             subgraph_score = sorted_score.data
                             sorted_subgraph_ind = keep_nms_ind[sort_ind] # the indices are to index sub-graph in original order
-                        else: # baseline model
-                            sort_ind = torch.arange(subgraph_score.size(0)).type_as(keep_nms_ind) # Note: don't sort subgraph_score since float points are different
+                        else: # model that use full graph
+                            sort_ind = torch.arange(subgraph_score.size(0)).type_as(keep_nms_ind)
                             seq = seqq.data
                             sorted_subgraph_ind = keep_nms_ind.data                               
                     else: # for show control and tell, order should be same as inputs and thus no sorting
@@ -124,7 +126,7 @@ def eval_split(model, crit, loader, eval_kwargs={}, opt=None, val_model=None):
                     print('beam seach sentences of image {}:'.format(data['infos'][0]['id']))
                     for i in np.random.choice(keep_ind, size=1, replace=True):
                         print('subgraph {}'.format(i))
-                        print('\n'.join([utils.decode_sequence(loader.get_vocab(), _['seq'].unsqueeze(0))[0] for _ in model.done_beams[i]])) # model.done_beams: [batch,beam_size]
+                        print('\n'.join([utils.decode_sequence(loader.get_vocab(), _['seq'].unsqueeze(0))[0] for _ in model.done_beams[i]]))
                         print('--' * 10)
                 
                 sents = utils.decode_sequence(loader.get_vocab(), seq)  # use the first beam which has highest cumulative score
@@ -142,57 +144,41 @@ def eval_split(model, crit, loader, eval_kwargs={}, opt=None, val_model=None):
                     print('keeping {} subgraphs'.format(len(sents)))
                     print('best subgraph score sentence: \n{}'.format(entry['caption'][best_ind]))
                     print('--' * 20)
-                # collect info for grounding evaluation
+                # collect grounding material for grounding evaluation
                 if return_att_weight:
-                    # either visualize grounding
-                    #vis_grounding_material(data, sents, sorted_subgraph_ind, att_weights, sort_ind, \
-                        #wd_to_lemma, lemma_det_id_dict, det_id_to_det_wd, grd_output, grd_and_sent, baseline=not model.gpn)
-                    # or get grounding material for grounding evaluation
-                    get_grounding_material(data, sents, sorted_subgraph_ind, att_weights, sort_ind, \
-                        wd_to_lemma, lemma_det_id_dict, det_id_to_det_wd, grd_output, grd_and_sent, baseline=not model.gpn)
+                    get_grounding_material(eval_kwargs['infos_path'], data, sents, sorted_subgraph_ind, att_weights, sort_ind, \
+                        wd_to_lemma, lemma_det_id_dict, det_id_to_det_wd, grd_output, \
+                        use_full_graph=not model.gpn, grd_sGPN_consensus=grd_sGPN_consensus)
 
             if data['bounds']['wrapped']:
                 break
             if num_images >= 0 and n >= num_images:
                 break
 
-        # post process after model inference
+        # save prediction results
         if data.get('labels', None) is not None and verbose_loss:  # after model validation, switch back to training mode
             model.train()
             return loss_sum/loss_evals
         else:  # after model testing, save generated results
             save_path = eval_kwargs['infos_path'].split('/')
-            if model.gpn: # use gpn
-                iou_thres = str(model.gpn_layer.iou_thres).split('.')[1]
-            else: # baseline
-                iou_thres = 'NA'
 
             if not sct_mode:  # sub-graph captioning
-                np.save(save_path[0] + '/' + save_path[1] + '/' + 'predictions_{}_nms_{}_beam-{}.npy'.format(save_path[-1].split('-')[1].split('.')[0], \
-                        iou_thres, eval_kwargs['beam_size']),predictions)
+                np.save(save_path[0] + '/' + save_path[1] + '/' + 'captions_{}.npy'.format(save_path[-1].split('-')[1].split('.')[0]),predictions)
             else:  # sct mode, controllability experiments
-                np.save(save_path[0] + '/' + save_path[1] + '/' + 'gt_sct_predictions_{}_nms_{}_beam-{}.npy'.format(save_path[-1].split('-')[1].split('.')[0], \
-                        iou_thres, eval_kwargs['beam_size']),predictions)
+                np.save(save_path[0] + '/' + save_path[1] + '/' + 'ctl_captions_{}.npy'.format(save_path[-1].split('-')[1].split('.')[0]),predictions)
 
             if return_att_weight:  # grounding experiments
-                # sentences used to evaluate caption performance
-                np.save(save_path[0] + '/' + save_path[1] + '/' + 'only_sents.npy',grd_and_sent['sent'])
-                # grounding material to evaluate grounding performance
                 with open(save_path[0] + '/' + save_path[1] + '/' + 'grounding_file.json', 'w') as f:
-                    json.dump({'results':grd_output, 'eval_mode':'gen', 'external_data':{'used':True, 'details':'Object detector pre-trained on VG.'}}, f)
+                    json.dump({'results':grd_output, 'eval_mode':'gen', 'external_data':{'used':True, 'details':'grounding experiment'}}, f)
 
     # 2. only evaluate the generated sentences
     if model is None:
-        if eval_kwargs['use_gpn'] == 1:
-            iou_thres = str(eval_kwargs.get('gpn_nms_thres', 0.75)).split('.')[1]
-        else:  # baseline
-            iou_thres = 'NA'
         oracle_num = eval_kwargs.get('oracle_num', 1)
         sent_cnt = []
         align_pred = []
         save_path = eval_kwargs['infos_path'].split('/')
-        predictions = np.load(save_path[0] + '/' + save_path[1] + '/' + 'predictions_{}_nms_{}_beam-{}.npy'.format(\
-            save_path[-1].split('-')[1].split('.')[0], iou_thres, eval_kwargs['beam_size']),allow_pickle=True).tolist()
+        predictions = np.load(save_path[0] + '/' + save_path[1] + '/' + 'captions_{}.npy'.format(\
+            save_path[-1].split('-')[1].split('.')[0]), allow_pickle=True,encoding='latin1').tolist()
         for p_i in range(len(predictions)):
             sent_cnt.append(len(predictions[p_i]['caption']))
             entry = {'image_id': predictions[p_i]['image_id'], 'caption': predictions[p_i]['caption'][:oracle_num]} 

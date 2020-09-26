@@ -20,12 +20,12 @@ class HybridLoader:
         self.db_path = db_path
         self.ext = ext
         if self.ext == '.npy':
-            self.loader = lambda x: np.load(x)
+            self.loader = lambda x: np.load(x,encoding='latin1')
         else:
             if "sg" or "graph" in db_path:
-                self.loader = lambda x: np.load(x,allow_pickle=True)['feat'].tolist()
+                self.loader = lambda x: np.load(x,allow_pickle=True,encoding='latin1')['feat'].tolist()
             else:
-                self.loader = lambda x: np.load(x)['feat']
+                self.loader = lambda x: np.load(x,encoding='latin1')['feat']
         self.db_type = 'dir'
     
     def get(self, key):
@@ -39,7 +39,7 @@ class HybridLoader:
 class pklLoader:
     def __init__(self, db_path):
         self.db_path = db_path
-        self.loader = lambda x: np.load(x)['feat']
+        self.loader = lambda x: np.load(x,encoding='latin1')['feat']
 
 class DataLoader(data.Dataset):
 
@@ -70,7 +70,7 @@ class DataLoader(data.Dataset):
         print('vocab size is ', self.vocab_size)
         
         # open the hdf5 file
-        print('DataLoader loading h5 file: ', opt.input_fc_dir, opt.input_att_dir, opt.input_box_dir, opt.input_label_h5)
+        print('DataLoader loading h5 file: ', opt.input_label_h5)
         self.h5_label_file = h5py.File(self.opt.input_label_h5, 'r', driver='core')
 
         if 'flickr' in opt.input_label_h5:
@@ -81,7 +81,7 @@ class DataLoader(data.Dataset):
         use_MRNN_split = opt.use_MRNN_split 
         mask_version = '1000'
         #self.thres = opt.gpn_label_thres 
-        self.use_gt_subg = opt.use_gt_subg  
+        #self.use_gt_subg = opt.use_gt_subg  
         self.trip_loader = HybridLoader("data/{}_sg_output_64".format(dataset_name), ".npz") 
         self.subgraph_mask = HybridLoader("data/{}_graph_mask_{}_rm_duplicate".format(dataset_name,mask_version), ".npz") 
 
@@ -99,7 +99,7 @@ class DataLoader(data.Dataset):
 
         self.split_ix = {'train': [], 'val': [], 'test': []}
         if use_MRNN_split:
-            MRNN_split_dict = np.load('data/MRNN_split_dict.npy',allow_pickle=True).tolist()
+            MRNN_split_dict = np.load('data/MRNN_split_dict.npy',allow_pickle=True,encoding='latin1').tolist()
             for ix in range(len(self.info['images'])):
                 img = self.info['images'][ix]
                 if MRNN_split_dict[img['id']] == 'train':
@@ -217,90 +217,63 @@ class DataLoader(data.Dataset):
         ix = index
         this_ix = np.array([index])
         img_id = self.info['images'][ix]['id']
-        if not self.use_gt_subg:
-            ############### load subgraph mini-batch for each sentence  ###############
-            # 1. sentence id within 5 sentences
-            subgraph_dict = self.subgraph_mask.get(str(img_id)) 
-            this_mini_batch = int(subgraph_dict['node_iou_mtx'][:,5:].shape[1] / 2)
-            mask_idx = np.full((self.seq_per_img,this_mini_batch,2),-1)
-            # original pos are occupied by first part of sub-graphs; original neg occupied by second part of sub-graphs
-            mask_idx[:,:,0] = np.repeat(np.arange(this_mini_batch).reshape(1,-1), self.seq_per_img, axis=0)
-            mask_idx[:,:,1] = mask_idx[:,:,0] + this_mini_batch
-            # Note: shift back to original index which includes sentence noun subgraph
-            mask_idx = mask_idx + 5
 
-            # get the mask of mini-batch
-            mask_info = subgraph_dict['subgraph_mask_list']
-            gpn_obj_ind = np.full((self.seq_per_img,2,this_mini_batch,self.obj_num),self.obj_num-1)
-            gpn_att_mask = np.full((self.seq_per_img,2,this_mini_batch,self.obj_num), 0).astype('float32') 
-            gpn_pred_ind = np.full((self.seq_per_img,2,this_mini_batch,self.rel_num),self.rel_num-1)
-            gpn_nrel_ind = np.full((self.seq_per_img,2,this_mini_batch,self.rel_num,2), self.obj_num-1)
-            gpn_pool_mtx = np.zeros((self.seq_per_img,2,this_mini_batch,self.obj_num,self.obj_num)).astype('float32') 
-            
-            for i in range(self.seq_per_img):
-                for k in range(this_mini_batch):
-                    # obj
-                    tmp = mask_info[mask_idx[i,k,0]][1].nonzero()[0]
-                    if tmp.shape[0] != 0:
-                        gpn_obj_ind[i,0,k,:tmp.shape[0]] = tmp # pos obj
-                    else:
-                        print("error: no object node in this sub-graph!")
-                    gpn_att_mask[i,0,k,:tmp.shape[0]] = 1 # pos obj used in LSTM
-                    gpn_pool_mtx[i,0,k,np.arange(tmp.shape[0]),np.arange(tmp.shape[0])] = 1 # sparse scatter mtx
+        ############### load subgraph mini-batch for each sentence  ###############
+        # 1. sentence id within 5 sentences
+        subgraph_dict = self.subgraph_mask.get(str(img_id)) 
+        this_mini_batch = int(subgraph_dict['node_iou_mtx'][:,5:].shape[1] / 2)
+        mask_idx = np.full((self.seq_per_img,this_mini_batch,2),-1)
+        # original pos are occupied by first part of sub-graphs; original neg occupied by second part of sub-graphs
+        mask_idx[:,:,0] = np.repeat(np.arange(this_mini_batch).reshape(1,-1), self.seq_per_img, axis=0)
+        mask_idx[:,:,1] = mask_idx[:,:,0] + this_mini_batch
+        # Note: shift back to original index which includes sentence noun subgraph
+        mask_idx = mask_idx + 5
 
-                    tmp = mask_info[mask_idx[i,k,1]][1].nonzero()[0]
-                    if tmp.shape[0] != 0:
-                        gpn_obj_ind[i,1,k,:tmp.shape[0]] = tmp # neg obj
-                    else:
-                        print("error: no object node in this sub-graph!")
-                    gpn_att_mask[i,1,k,:tmp.shape[0]] = 1 # pos obj used in LSTM
-                    gpn_pool_mtx[i,1,k,np.arange(tmp.shape[0]),np.arange(tmp.shape[0])] = 1 # sparse scatter mtx
-
-                    # predicate
-                    tmp = mask_info[mask_idx[i,k,0]][2].nonzero()[0]
-                    if tmp.shape[0] != 0:
-                        gpn_pred_ind[i,0,k,:tmp.shape[0]] = tmp # pos pred
-                    tmp = mask_info[mask_idx[i,k,1]][2].nonzero()[0]
-                    if tmp.shape[0] != 0:
-                        gpn_pred_ind[i,1,k,:tmp.shape[0]] = tmp # neg pred
-
-                    # new rel ind
-                    tmp = mask_info[mask_idx[i,k,0]][3]
-                    if tmp.shape[0] != 0:
-                        gpn_nrel_ind[i,0,k,:tmp.shape[0]] = tmp
-                    tmp = mask_info[mask_idx[i,k,1]][3]
-                    if tmp.shape[0] != 0:
-                        gpn_nrel_ind[i,1,k,:tmp.shape[0]] = tmp
-            ############### load subgraph mini-batch for each sentence  ###############
-        elif self.use_gt_subg:
-            # 1. sentence id within 5 sentences
-            subgraph_dict = self.subgraph_mask.get(str(img_id)) 
-            # get the mask of mini-batch
-            mask_info = subgraph_dict['subgraph_mask_list']
-            gpn_obj_ind = np.full((self.seq_per_img,2,self.half_mini_batch,self.obj_num),self.obj_num-1)
-            gpn_att_mask = np.full((self.seq_per_img,2,self.half_mini_batch,self.obj_num), 0).astype('float32') 
-            gpn_pred_ind = np.full((self.seq_per_img,2,self.half_mini_batch,self.rel_num),self.rel_num-1)
-            gpn_nrel_ind = np.full((self.seq_per_img,2,self.half_mini_batch,self.rel_num,2), self.obj_num-1)
-            gpn_pool_mtx = np.zeros((self.seq_per_img,2,self.half_mini_batch,self.obj_num,self.obj_num)).astype('float32') 
-            
-            for i in range(self.seq_per_img):
+        # get the mask of mini-batch
+        mask_info = subgraph_dict['subgraph_mask_list']
+        gpn_obj_ind = np.full((self.seq_per_img,2,this_mini_batch,self.obj_num),self.obj_num-1)
+        gpn_att_mask = np.full((self.seq_per_img,2,this_mini_batch,self.obj_num), 0).astype('float32') 
+        gpn_pred_ind = np.full((self.seq_per_img,2,this_mini_batch,self.rel_num),self.rel_num-1)
+        gpn_nrel_ind = np.full((self.seq_per_img,2,this_mini_batch,self.rel_num,2), self.obj_num-1)
+        gpn_pool_mtx = np.zeros((self.seq_per_img,2,this_mini_batch,self.obj_num,self.obj_num)).astype('float32') 
+        
+        for i in range(self.seq_per_img):
+            for k in range(this_mini_batch):
                 # obj
-                tmp = mask_info[i][1].nonzero()[0]
+                tmp = mask_info[mask_idx[i,k,0]][1].nonzero()[0]
                 if tmp.shape[0] != 0:
-                    gpn_obj_ind[i,:,:,:tmp.shape[0]] = tmp # pos obj
-                gpn_att_mask[i,:,:,:tmp.shape[0]] = 1 # pos obj used in LSTM
-                gpn_pool_mtx[i,:,:,np.arange(tmp.shape[0]),np.arange(tmp.shape[0])] = 1 # sparse scatter mtx
+                    gpn_obj_ind[i,0,k,:tmp.shape[0]] = tmp # pos obj
+                else:
+                    print("error: no object node in this sub-graph!")
+                gpn_att_mask[i,0,k,:tmp.shape[0]] = 1 # pos obj used in LSTM
+                gpn_pool_mtx[i,0,k,np.arange(tmp.shape[0]),np.arange(tmp.shape[0])] = 1 # sparse scatter mtx
+
+                tmp = mask_info[mask_idx[i,k,1]][1].nonzero()[0]
+                if tmp.shape[0] != 0:
+                    gpn_obj_ind[i,1,k,:tmp.shape[0]] = tmp # neg obj
+                else:
+                    print("error: no object node in this sub-graph!")
+                gpn_att_mask[i,1,k,:tmp.shape[0]] = 1 # pos obj used in LSTM
+                gpn_pool_mtx[i,1,k,np.arange(tmp.shape[0]),np.arange(tmp.shape[0])] = 1 # sparse scatter mtx
 
                 # predicate
-                tmp = mask_info[i][2].nonzero()[0]
+                tmp = mask_info[mask_idx[i,k,0]][2].nonzero()[0]
                 if tmp.shape[0] != 0:
-                    gpn_pred_ind[i,:,:,:tmp.shape[0]] = tmp # pos pred
+                    gpn_pred_ind[i,0,k,:tmp.shape[0]] = tmp # pos pred
+                tmp = mask_info[mask_idx[i,k,1]][2].nonzero()[0]
+                if tmp.shape[0] != 0:
+                    gpn_pred_ind[i,1,k,:tmp.shape[0]] = tmp # neg pred
 
                 # new rel ind
-                tmp = mask_info[i][3]
+                tmp = mask_info[mask_idx[i,k,0]][3]
                 if tmp.shape[0] != 0:
-                    gpn_nrel_ind[i,:,:,:tmp.shape[0]] = tmp        
-
+                    gpn_nrel_ind[i,0,k,:tmp.shape[0]] = tmp
+                tmp = mask_info[mask_idx[i,k,1]][3]
+                if tmp.shape[0] != 0:
+                    gpn_nrel_ind[i,1,k,:tmp.shape[0]] = tmp
+        ############### load subgraph mini-batch for each sentence  ###############   
+        
+        ############### load full SG with dummy node and dummpy predicate/rel_ind  ###############
         # 2. object related data 
         sg_output = self.trip_loader.get(str(img_id))
         object_fmap = sg_output['object_fmap'][:self.obj_num,:] 
@@ -322,7 +295,6 @@ class DataLoader(data.Dataset):
         this_len = min(rel_ind.shape[0], self.rel_num - 1)
         pad_pred_dist[0, :this_len,:] = pred_dist[:this_len] 
         pad_rel_ind[0, :this_len,:] = rel_ind[:this_len]        
-
         ############### load full SG with dummy node and dummpy predicate/rel_ind  ###############
 
         label = np.zeros([self.seq_per_img, self.seq_length + 2], dtype = 'int64')

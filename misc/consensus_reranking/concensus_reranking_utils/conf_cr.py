@@ -32,7 +32,7 @@ class Conf_Cr:
         # Settings for hypotheses annotation list file
         self.fol_hypo_list = './hypotheses_mRNN'
         #self.name_tar_data = 'crVal'
-        self.fname_hypo_list = os.path.join(self.fol_hypo_list, input_args.input_file)
+        self.fname_hypo_list = os.path.join(self.fol_hypo_list, input_args.converted_file)
         self.gen_method = 'caption'
 
         # self.fname_hypo_list = os.path.join(self.fol_hypo_list, 'test_20_genS.npy') # DEBUG
@@ -65,8 +65,8 @@ class Conf_Cr:
         # Evaluation settings
         self.fol_coco_eval = './external/coco-caption'
         if 'flickr30k' in self.fname_anno_list_ref:
-            self.fname_eval_ref = os.path.join('../../coco-caption', \
+            self.fname_eval_ref = os.path.join('../coco-caption', \
                 'annotations', 'caption_flickr30k.json')
         else:
-            self.fname_eval_ref = os.path.join('../../coco-caption', \
+            self.fname_eval_ref = os.path.join('../coco-caption', \
                 'annotations', 'captions_val2014.json')

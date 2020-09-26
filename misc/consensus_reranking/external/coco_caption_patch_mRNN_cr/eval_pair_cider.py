@@ -24,7 +24,7 @@ class COCOEvalCapPairCider:
             res[imgId] = self.coco.imgToAnns[imgId]
 
         # Tokenize
-        print 'tokenization...'
+        print('tokenization...')
         tokenizer = PTBTokenizer()
         gts  = tokenizer.tokenize(gts)
         res = tokenizer.tokenize(res)

@@ -228,7 +228,7 @@ def train(opt):
 
                 # Stop if reaching max epochs
                 if epoch >= opt.max_epochs and opt.max_epochs != -1:
-                    save_checkpoint(model, infos, optimizer, append='last')
+                    #save_checkpoint(model, infos, optimizer, append='last')
                     break
     except (RuntimeError, KeyboardInterrupt):
         stack_trace = traceback.format_exc()

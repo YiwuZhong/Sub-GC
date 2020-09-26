@@ -23,7 +23,7 @@ def calculate_bleu_sentence(target_sentence, ref_sentence, n, fpr=1.0):
     precisions = []
     recalls = []
 
-    for i in xrange(n):
+    for i in range(n):
         if n > len(target_sentence) or n > len(ref_sentence):
             fscores.append(0.0)
             precisions.append(0.0)
@@ -54,7 +54,7 @@ def calculate_bleu_sentence(target_sentence, ref_sentence, n, fpr=1.0):
 
     B_s = []
         
-    for i in xrange(n):
+    for i in range(n):
         weighted_s = math.fsum(fscores[:i+1]) / float(i+1)
         B_s.append(weighted_s)
     
