@@ -63,7 +63,7 @@ First download all the data from [Google Drive](https://drive.google.com/drive/f
 ```
 Finally, move the files to the same directories (`data`, `misc`, `pretrained`) in this repository. Please make sure that the final folder structure is kept the same.
 
-The folder [`data`](https://github.com/YiwuZhong/Sub-GC-Draft/tree/master/data) contains the data that is derived from COCO Caption dataset and Flickr30K dataset. The folder [`pretrained`](https://github.com/YiwuZhong/Sub-GC-Draft/tree/master/pretrained) includes the pre-trained models of our paper. The folder `misc` includes the code and the data that are used for evaluation. Files of `res_feat*` are the global image features (ResNet-101) for each image in the datasets.
+The folder [`data`](https://github.com/YiwuZhong/Sub-GC/tree/master/data) contains the data that is derived from COCO Caption dataset and Flickr30K dataset. The folder [`pretrained`](https://github.com/YiwuZhong/Sub-GC/tree/master/pretrained) includes the pre-trained models of our paper. The folder `misc` includes the code and the data that are used for evaluation. Files of `res_feat*` are the global image features (ResNet-101) for each image in the datasets.
 
 To download the code and models for SPICE evaluation, run
 ```

@@ -22,7 +22,7 @@ For the other dependencies, run `pip install -r requirements.txt` to install.
 
 ## Data
 
-Check [DATA.md](https://github.com/YiwuZhong/Sub-GC-Draft/blob/master/DATA.md) for instructions of data downloading.
+Check [DATA.md](https://github.com/YiwuZhong/Sub-GC/blob/master/DATA.md) for instructions of data downloading.
 
 ## Model Training
 
